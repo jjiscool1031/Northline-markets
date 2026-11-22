@@ -2,6 +2,7 @@
 from flask import Flask, jsonify, request, render_template_string
 import requests
 import os
+import re
 app = Flask(__name__)
 
 # PASTE YOUR NEW TWELVE DATA API KEY BETWEEN THE QUOTES
@@ -731,7 +732,7 @@ def home():
 
 @app.route("/api/market")
 def market():
-    if API_KEY == "PASTE_YOUR_NEW_TWELVE_DATA_API_KEY_HERE":
+    if not API_KEY:
         return jsonify({
             "error": "Add your new Twelve Data API key near the top of app.py first."
         }), 400
@@ -746,15 +747,15 @@ def market():
 
 @app.route("/api/quote")
 def quote():
-    if API_KEY == "PASTE_YOUR_NEW_TWELVE_DATA_API_KEY_HERE":
+    if not API_KEY:
         return jsonify({
             "error": "Add your Twelve Data API key near the top of app.py first."
         }), 400
 
     symbol = request.args.get("symbol", "").strip().upper()
 
-    if not symbol:
-        return jsonify({"error": "Enter a stock symbol."}), 400
+    if not re.fullmatch(r"[A-Z0-9.\-]{1,10}", symbol):
+        return jsonify({"error": "Enter a valid stock symbol."}), 400
 
     data = get_data("quote", {"symbol": symbol})
 
@@ -766,7 +767,7 @@ def quote():
 
 @app.route("/api/history")
 def history():
-    if API_KEY == "PASTE_YOUR_NEW_TWELVE_DATA_API_KEY_HERE":
+    if not API_KEY:
         return jsonify({"error": "Add your Twelve Data API key first."}), 400
 
     symbol = request.args.get("symbol", "").strip().upper()
@@ -782,8 +783,8 @@ def history():
     if period not in settings:
         return jsonify({"error": "Invalid chart time range."}), 400
 
-    if not symbol:
-        return jsonify({"error": "Enter a stock symbol."}), 400
+    if not re.fullmatch(r"[A-Z0-9.\-]{1,10}", symbol):
+        return jsonify({"error": "Enter a valid stock symbol."}), 400
 
     params = {
         "symbol": symbol,
@@ -802,5 +803,6 @@ def history():
 
 if __name__ == "__main__":
     print("\nNORTHLINE MARKETS")
-    print("Open http://127.0.0.1:5000 in your browser.")
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    port = int(os.environ.get("PORT", "5000"))
+    print(f"Starting Northline Markets on port {port}.")
+    app.run(host="0.0.0.0", port=port, debug=False)
