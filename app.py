@@ -1,5 +1,5 @@
 
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, request
 import requests
 import os
 import time
@@ -285,11 +285,137 @@ h1 {
     <a class="nav" href="/?section=crypto">Cryptocurrency</a>
 
     <h3>TOOLS</h3>
-    <a class="nav" href="/?section=watchlist">Watchlist</a>
-    <a class="nav" href="/?section=education">Learning Center</a>
+<a class="nav" href="/?section=watchlist">Watchlist</a>
+<a class="nav" href="/?section=education">Learning Center</a>
+<a class="nav" href="/?section=help">Help Center</a>
+<a class="nav" href="/?section=academy">Trading Academy</a>
 </aside>
 
 <main>
+    {% set section = request.args.get('section', 'overview') %}
+
+    {% if section == 'help' %}
+        <h1>Help Center</h1>
+        <div class="subtitle">Find answers and learn how to use Northline Markets.</div>
+        <div class="help-search">
+    <input
+        type="text"
+        id="help-search"
+        placeholder="Search for answers..."
+    >
+</div>
+
+<div class="help-categories">
+    <button type="button" onclick="filterHelp('all')">All Questions</button>
+    <button type="button" onclick="filterHelp('charts')">Charts</button>
+    <button type="button" onclick="filterHelp('markets')">Markets</button>
+    <button type="button" onclick="filterHelp('platform')">Platform</button>
+</div>
+
+<div class="faq-list">
+
+    <details class="faq-item" data-category="platform">
+        <summary>What is Northline Markets?</summary>
+        <p>Northline Markets is an educational financial markets platform designed to help users explore stocks, market data, charts, and trading concepts.</p>
+    </details>
+
+    <details class="faq-item" data-category="charts">
+        <summary>How do I read a candlestick chart?</summary>
+        <p>Each candlestick represents price movement over a selected time period. The body shows the opening and closing prices, while the wicks show the highest and lowest prices.</p>
+    </details>
+
+    <details class="faq-item" data-category="markets">
+        <summary>What is the S&P 500?</summary>
+        <p>The S&P 500 is an index that tracks approximately 500 leading publicly traded U.S. companies.</p>
+    </details>
+
+    <details class="faq-item" data-category="charts">
+        <summary>Why isn't my chart loading?</summary>
+        <p>Charts may occasionally fail because of data-provider limits, unavailable historical data, or temporary connection issues.</p>
+    </details>
+
+    <details class="faq-item" data-category="markets">
+        <summary>Why are stock prices delayed?</summary>
+        <p>Market data availability and delays depend on the data provider and subscription plan. Some displayed prices may not be real-time.</p>
+    </details>
+
+    <details class="faq-item" data-category="platform">
+        <summary>What is a watchlist?</summary>
+        <p>A watchlist lets you keep track of selected stocks and follow their price movements in one place.</p>
+    </details>
+
+</div>
+
+    {% elif section == 'academy' %}
+        <h1>Trading Academy</h1>
+        <div class="subtitle">Build your understanding of financial markets step by step.</div>
+        <div class="academy-grid">
+
+    <div class="panel academy-card">
+        <h2>01. Stock Market Basics</h2>
+        <p>Learn how financial markets work and understand the basics.</p>
+        <details>
+            <summary>Explore this lesson</summary>
+            <p><strong>What is a stock?</strong> A stock represents ownership in a company.</p>
+            <p><strong>What is an exchange?</strong> An exchange is a marketplace where financial securities are bought and sold.</p>
+            <p><strong>What is an index?</strong> An index tracks the performance of a selected group of investments.</p>
+        </details>
+    </div>
+
+    <div class="panel academy-card">
+        <h2>02. Understanding Charts</h2>
+        <p>Learn how traders study price movements and market activity.</p>
+        <details>
+            <summary>Explore this lesson</summary>
+            <p><strong>Candlesticks:</strong> Show opening, closing, highest, and lowest prices during a time period.</p>
+            <p><strong>Volume:</strong> Shows how many shares were traded during a period.</p>
+            <p><strong>Timeframes:</strong> Charts can display price activity over minutes, hours, days, or longer.</p>
+        </details>
+    </div>
+
+    <div class="panel academy-card">
+        <h2>03. Technical Analysis</h2>
+        <p>Explore common methods used to study historical market behavior.</p>
+        <details>
+            <summary>Explore this lesson</summary>
+            <p><strong>Support:</strong> A price area where buying interest has historically appeared.</p>
+            <p><strong>Resistance:</strong> A price area where selling interest has historically appeared.</p>
+            <p><strong>Trends:</strong> General upward, downward, or sideways price movements.</p>
+        </details>
+    </div>
+
+    <div class="panel academy-card">
+        <h2>04. Trading Strategies</h2>
+        <p>Understand how trading plans are structured.</p>
+        <details>
+            <summary>Explore this lesson</summary>
+            <p>Study how traders define their goals, entry conditions, exit conditions, and the reasons behind each decision.</p>
+            <p>There is no strategy that guarantees a profitable result. Historical patterns do not predict future prices.</p>
+        </details>
+    </div>
+
+    <div class="panel academy-card">
+        <h2>05. Risk Management</h2>
+        <p>Understand how traders think about uncertainty and potential losses.</p>
+        <details>
+            <summary>Explore this lesson</summary>
+            <p>Learn about position sizing, diversification, risk limits, and why protecting capital matters.</p>
+            <p>Never assume a trade will work out as expected.</p>
+        </details>
+    </div>
+
+    <div class="panel academy-card">
+        <h2>06. Practice & Review</h2>
+        <p>Learn through simulated examples before studying real-world decisions.</p>
+        <details>
+            <summary>Explore this lesson</summary>
+            <p>Use paper trading to practice with simulated money. Record your reasoning, review outcomes, and learn from mistakes without risking real money.</p>
+        </details>
+    </div>
+
+</div>
+
+    {% else %}
     <h1>Market Overview</h1>
     <div class="subtitle">
         Your central hub for financial markets and market information.
@@ -408,6 +534,33 @@ loadQuote("QQQ", "ticker-qqq");
 loadQuote("AAPL", "ticker-aapl");
 loadQuote("NVDA", "ticker-nvda");
 loadQuote("TSLA", "ticker-tsla");
+const helpSearch = document.getElementById("help-search");
+
+if (helpSearch) {
+    helpSearch.addEventListener("input", function () {
+        const searchText = helpSearch.value.toLowerCase();
+        const questions = document.querySelectorAll(".faq-item");
+
+        questions.forEach(question => {
+            const questionText = question.textContent.toLowerCase();
+
+            question.style.display = questionText.includes(searchText)
+                ? "block"
+                : "none";
+        });
+    });
+}
+
+function filterHelp(category) {
+    const questions = document.querySelectorAll(".faq-item");
+
+    questions.forEach(question => {
+        const matches = category === "all" ||
+            question.dataset.category === category;
+
+        question.style.display = matches ? "block" : "none";
+    });
+}
 const chartElement = document.getElementById("trading-chart");
 
 if (chartElement && window.LightweightCharts) {
