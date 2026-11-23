@@ -188,6 +188,44 @@ h1 {
     main {
         padding: 16px;
     }
+}.ticker-bar {
+    display: flex;
+    align-items: center;
+    gap: 35px;
+    padding: 15px 25px;
+    background: #0d1522;
+    border-bottom: 1px solid #263247;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.ticker-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 85px;
+}
+
+.ticker-item span {
+    color: #8292aa;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.ticker-item strong {
+    color: #36c98f;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.ticker-bar::-webkit-scrollbar {
+    height: 4px;
+}
+
+.ticker-bar::-webkit-scrollbar-thumb {
+    background: #34445e;
+    border-radius: 5px;
 }
 </style>
 </head>
@@ -198,7 +236,40 @@ h1 {
     <div class="logo">NORTHLINE MARKETS</div>
     <div class="status">● MARKET DASHBOARD</div>
 </header>
-
+<div class="ticker-bar">
+    <div class="ticker-item">
+        <span>SPY</span>
+        <strong id="ticker-spy">Loading...</strong>
+    </div>
+    <div class="ticker-item">
+        <span>QQQ</span>
+        <strong id="ticker-qqq">Loading...</strong>
+    </div>
+    <div class="ticker-item">
+        <span>AAPL</span>
+        <strong id="ticker-aapl">Loading...</strong>
+    </div>
+    <div class="ticker-item">
+        <span>NVDA</span>
+        <strong id="ticker-nvda">Loading...</strong>
+    </div>
+    <div class="ticker-item">
+        <span>TSLA</span>
+        <strong id="ticker-tsla">Loading...</strong>
+    </div>
+    <div class="ticker-item">
+        <span>GOLD</span>
+        <strong id="ticker-gold">Loading...</strong>
+    </div>
+    <div class="ticker-item">
+        <span>SILVER</span>
+        <strong id="ticker-silver">Loading...</strong>
+    </div>
+    <div class="ticker-item">
+        <span>BITCOIN</span>
+        <strong id="ticker-btc">Loading...</strong>
+    </div>
+</div>
 <div class="layout">
 
 <aside class="sidebar">
@@ -307,8 +378,12 @@ async function loadQuote(symbol, elementId) {
 loadQuote("SPY", "spy");
 loadQuote("QQQ", "qqq");
 loadQuote("DIA", "dia");
+loadQuote("SPY", "ticker-spy");
+loadQuote("QQQ", "ticker-qqq");
+loadQuote("AAPL", "ticker-aapl");
+loadQuote("NVDA", "ticker-nvda");
+loadQuote("TSLA", "ticker-tsla");
 </script>
-
 </body>
 </html>
 """
