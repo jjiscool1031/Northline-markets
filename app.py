@@ -503,7 +503,9 @@ h1 {
             A market information and financial education platform.
             More tools and interactive features are on the way.
         </p>
-    </section>
+       </section>
+
+    {% endif %}
 </main>
 
 </div>
