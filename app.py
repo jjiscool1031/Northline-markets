@@ -2,11 +2,12 @@
 from flask import Flask, jsonify, render_template_string
 import requests
 import os
-
+import time
 app = Flask(__name__)
 
 API_KEY = os.environ.get("TWELVE_DATA_API_KEY", "")
-
+PRICE_CACHE = {}
+CACHE_DURATION = 30
 HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -403,6 +404,11 @@ def quote(symbol):
         return jsonify({"error": "Invalid symbol"}), 400
 
     try:
+        cached = PRICE_CACHE.get(symbol)
+
+        if cached and time.time() - cached["time"] < CACHE_DURATION:
+            return jsonify({"price": cached["price"]})
+
         response = requests.get(
             "https://api.twelvedata.com/price",
             params={"symbol": symbol, "apikey": API_KEY},
@@ -412,7 +418,10 @@ def quote(symbol):
 
         if "price" not in data:
             return jsonify({"error": data.get("message", "Quote unavailable")}), 502
-
+        PRICE_CACHE[symbol] = {
+        "price": data["price"],
+        "time": time.time()
+        }
         return jsonify({"price": data["price"]})
 
     except requests.RequestException:
