@@ -8,6 +8,8 @@ app = Flask(__name__)
 API_KEY = os.environ.get("TWELVE_DATA_API_KEY", "")
 PRICE_CACHE = {}
 CACHE_DURATION = 30
+HISTORY_CACHE = {}
+HISTORY_CACHE_DURATION = 60
 HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -531,6 +533,11 @@ def history(symbol):
         return jsonify({"error": "Invalid symbol"}), 400
 
     try:
+        cached = HISTORY_CACHE.get(symbol)
+
+        if cached and time.time() - cached["time"] < HISTORY_CACHE_DURATION:
+            return jsonify({"values": cached["values"]})
+
         response = requests.get(
             "https://api.twelvedata.com/time_series",
             params={
@@ -548,6 +555,11 @@ def history(symbol):
             return jsonify({
                 "error": data.get("message", "Historical data unavailable")
             }), 502
+
+        HISTORY_CACHE[symbol] = {
+            "values": data["values"],
+            "time": time.time()
+        }
 
         return jsonify({"values": data["values"]})
 
