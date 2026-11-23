@@ -439,35 +439,43 @@ if (chartElement && window.LightweightCharts) {
         wickUpColor: "#16c784",
         wickDownColor: "#ea3943"
     });
+const chartCache = {};
+   
 
-    async function loadCandles(symbol) {
-        candles.setData([]);
+async function loadCandles(symbol) {
+    candles.setData([]);
 
-        try {
-            const response = await fetch(`/api/history/${symbol}`);
-            const data = await response.json();
-
-            if (!data.values) {
-                console.error(data.error || "Chart data unavailable");
-                return;
-            }
-
-            const formatted = data.values.reverse().map(item => ({
-                time: item.datetime,
-                open: Number(item.open),
-                high: Number(item.high),
-                low: Number(item.low),
-                close: Number(item.close)
-            }));
-
-            candles.setData(formatted);
-            console.log("Chart data loaded:", formatted);
-            chart.timeScale().fitContent();
-
-        } catch (error) {
-            console.error("Chart loading error:", error);
-        }
+    if (chartCache[symbol]) {
+        candles.setData(chartCache[symbol]);
+        chart.timeScale().fitContent();
+        return;
     }
+
+    try {
+        const response = await fetch(`/api/history/${symbol}`);
+        const data = await response.json();
+
+        if (!data.values) {
+            console.error(data.error || "Chart data unavailable");
+            return;
+        }
+
+        const formatted = data.values.reverse().map(item => ({
+            time: item.datetime,
+            open: Number(item.open),
+            high: Number(item.high),
+            low: Number(item.low),
+            close: Number(item.close)
+        }));
+
+        chartCache[symbol] = formatted;
+        candles.setData(formatted);
+        chart.timeScale().fitContent();
+
+    } catch (error) {
+        console.error("Chart loading error:", error);
+    }
+}
 
     loadCandles("SPY");
 
