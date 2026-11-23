@@ -461,6 +461,7 @@ if (chartElement && window.LightweightCharts) {
             }));
 
             candles.setData(formatted);
+            console.log("Chart data loaded:", formatted);
             chart.timeScale().fitContent();
 
         } catch (error) {
