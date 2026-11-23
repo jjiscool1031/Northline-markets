@@ -229,6 +229,7 @@ h1 {
     border-radius: 5px;
 }
 </style>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 
 <body>
@@ -316,11 +317,32 @@ h1 {
 
     <div class="content-grid">
         <section class="panel">
+    <div class="chart-header">
+        <div>
             <h2>Market Chart</h2>
-            <div class="chart-placeholder">
-                Interactive candlestick chart coming in the next build step.
-            </div>
-        </section>
+            <p style="color:#8998ad;font-size:13px;">
+                Interactive price chart
+            </p>
+        </div>
+
+        <select id="chart-symbol" class="chart-select">
+            <option value="SPY">SPY</option>
+            <option value="QQQ">QQQ</option>
+            <option value="AAPL">AAPL</option>
+            <option value="NVDA">NVDA</option>
+            <option value="TSLA">TSLA</option>
+        </select>
+    </div>
+
+    <div id="trading-chart" style="width:100%;height:400px;"></div>
+
+    <div class="chart-timeframes">
+        <button type="button">1D</button>
+        <button type="button">1W</button>
+        <button type="button">1M</button>
+        <button type="button">3M</button>
+    </div>
+</section>
 
         <section class="panel">
             <h2>Market Watch</h2>
@@ -384,6 +406,78 @@ loadQuote("QQQ", "ticker-qqq");
 loadQuote("AAPL", "ticker-aapl");
 loadQuote("NVDA", "ticker-nvda");
 loadQuote("TSLA", "ticker-tsla");
+const chartElement = document.getElementById("trading-chart");
+
+if (chartElement && window.LightweightCharts) {
+    const chart = LightweightCharts.createChart(chartElement, {
+        width: chartElement.clientWidth,
+        height: 400,
+        layout: {
+            background: { color: "#111827" },
+            textColor: "#d1d5db"
+        },
+        grid: {
+            vertLines: { color: "#263244" },
+            horzLines: { color: "#263244" }
+        },
+        rightPriceScale: {
+            borderColor: "#34445e"
+        },
+        timeScale: {
+            borderColor: "#34445e",
+            timeVisible: true
+        }
+    });
+
+    const candles = chart.addCandlestickSeries({
+        upColor: "#16c784",
+        downColor: "#ea3943",
+        borderUpColor: "#16c784",
+        borderDownColor: "#ea3943",
+        wickUpColor: "#16c784",
+        wickDownColor: "#ea3943"
+    });
+
+    async function loadCandles(symbol) {
+        candles.setData([]);
+
+        try {
+            const response = await fetch(`/api/history/${symbol}`);
+            const data = await response.json();
+
+            if (!data.values) {
+                console.error(data.error || "Chart data unavailable");
+                return;
+            }
+
+            const formatted = data.values.reverse().map(item => ({
+                time: item.datetime,
+                open: Number(item.open),
+                high: Number(item.high),
+                low: Number(item.low),
+                close: Number(item.close)
+            }));
+
+            candles.setData(formatted);
+            chart.timeScale().fitContent();
+
+        } catch (error) {
+            console.error("Chart loading error:", error);
+        }
+    }
+
+    loadCandles("SPY");
+
+    document.getElementById("chart-symbol").addEventListener("change", event => {
+        loadCandles(event.target.value);
+    });
+
+    window.addEventListener("resize", () => {
+        chart.applyOptions({
+            width: chartElement.clientWidth
+        });
+    });
+}
 </script>
 </body>
 </html>
@@ -426,7 +520,41 @@ def quote(symbol):
 
     except requests.RequestException:
         return jsonify({"error": "Market data service unavailable"}), 502
+@app.route("/api/history/<symbol>")
+def history(symbol):
+    if not API_KEY:
+        return jsonify({"error": "API key not configured"}), 503
 
+    symbol = symbol.upper()
+
+    if not symbol.isalnum() or len(symbol) > 10:
+        return jsonify({"error": "Invalid symbol"}), 400
+
+    try:
+        response = requests.get(
+            "https://api.twelvedata.com/time_series",
+            params={
+                "symbol": symbol,
+                "interval": "1day",
+                "outputsize": 100,
+                "apikey": API_KEY
+            },
+            timeout=10
+        )
+
+        data = response.json()
+
+        if "values" not in data:
+            return jsonify({
+                "error": data.get("message", "Historical data unavailable")
+            }), 502
+
+        return jsonify({"values": data["values"]})
+
+    except requests.RequestException:
+        return jsonify({
+            "error": "Historical market data unavailable"
+        }), 502
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
