@@ -337,7 +337,16 @@ footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--muted);f
   </div>
 
   <div class="grid g4" id="pt-sum"></div>
-
+<div class="panel" style="margin-top:20px">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+    <div>
+      <h2>Market Chart</h2>
+      <p class="note">Interactive candlestick chart · Select an asset and timeframe</p>
+    </div>
+    <span class="note">NORTHLINE CHARTING</span>
+  </div>
+  {% include_chart %}
+</div>
   <div class="grid g2" style="margin-top:20px;align-items:start">
 
     <div class="panel">
