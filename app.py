@@ -78,32 +78,63 @@ def demo_quote(sym):
     pct = rnd.uniform(-1.5, 1.5)
     return {"price": round(base * (1 + pct / 100), 2), "pct": round(pct, 2)}
 
+
 def fetch_quotes(symbols):
     now, out, missing = time.time(), {}, []
+    used_demo = False
+
+    # Check cached prices first.
     for s in symbols:
         c = QUOTE_CACHE.get(s)
         if c and now - c["t"] < QUOTE_TTL:
             out[s] = c["d"]
         else:
             missing.append(s)
+
+    # Use sample prices if no API key is configured.
     if missing and not API_KEY:
         for s in missing:
             out[s] = demo_quote(s)
         return out, True
+
+    # Try to retrieve live prices.
     if missing:
         try:
-            data = requests.get(BASE + "/quote", params={"symbol": ",".join(missing), "apikey": API_KEY}, timeout=10).json()
+            response = requests.get(
+                BASE + "/quote",
+                params={
+                    "symbol": ",".join(missing),
+                    "apikey": API_KEY
+                },
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+
             if len(missing) == 1:
                 data = {missing[0]: data}
+
             for s in missing:
                 d = data.get(s, {})
-                if "close" in d:
-                    q = {"price": round(float(d["close"]), 2), "pct": round(float(d.get("percent_change") or 0), 2)}
+
+                if isinstance(d, dict) and "close" in d:
+                    q = {
+                        "price": round(float(d["close"]), 2),
+                        "pct": round(float(d.get("percent_change") or 0), 2)
+                    }
                     QUOTE_CACHE[s] = {"d": q, "t": now}
                     out[s] = q
-        except (requests.RequestException, ValueError):
-            pass
-    return out, False
+                else:
+                    out[s] = demo_quote(s)
+                    used_demo = True
+
+        except (requests.RequestException, ValueError, TypeError):
+            for s in missing:
+                out[s] = demo_quote(s)
+            used_demo = True
+
+    return out, used_demo
+
 
 def demo_history(sym, bars, intraday):
     rnd = random.Random(sym)
@@ -252,7 +283,9 @@ footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--muted);f
  <div class="ticker" id="ticker" aria-label="Live prices"></div>
 </div></header>
 <main><div class="wrap">
-<div id="demo-banner" class="banner" hidden>Showing sample data. Add your TWELVE_DATA_API_KEY to see live prices.</div>
+<div id="demo-banner" class="banner" hidden>
+  Showing sample prices because live market data is unavailable. Prices are for demonstration only.
+</div>
 
 {% if page == 'home' %}
 <h1>Learn to invest in stocks and precious metals</h1>
@@ -287,17 +320,121 @@ footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--muted);f
 <div class="panel"><div class="chartbar"><select id="w-sel" aria-label="Symbol">{% for s,l in symbols.items() %}<option value="{{s}}">{{l}} ({{s}})</option>{% endfor %}</select><button type="button" id="w-add" class="on">Add to watchlist</button></div>
 <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Symbol</th><th>Name</th><th class="r">Price</th><th class="r">Change</th><th></th></tr></thead><tbody id="w-body"></tbody></table></div><p class="note" id="w-empty"></p></div>
 
+
 {% elif page == 'paper' %}
-<h1>Paper trading</h1><p class="lead">Practice with $100,000 of pretend money at current prices. Nothing here is real, and prices may be delayed.</p>
-<div class="grid g4" id="pt-sum"></div>
-<div class="grid g2" style="margin-top:16px">
- <div class="panel"><h2>Place an order</h2>
-  <label>Symbol</label><select id="pt-sym" style="width:100%">{% for s,l in symbols.items() %}<option value="{{s}}">{{l}} ({{s}})</option>{% endfor %}</select>
-  <label>Shares</label><input id="pt-qty" type="number" value="10" min="1">
-  <div style="display:flex;gap:10px;margin-top:14px"><button type="button" id="pt-buy" class="on">Buy</button><button type="button" id="pt-sell">Sell</button><button type="button" id="pt-reset" style="margin-left:auto">Reset account</button></div>
-  <p class="note" id="pt-msg" aria-live="polite"></p></div>
- <div class="panel" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>Symbol</th><th class="r">Shares</th><th class="r">Avg cost</th><th class="r">Last</th><th class="r">P/L</th></tr></thead><tbody id="pt-body"></tbody></table></div>
+<div class="paper-terminal">
+
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:22px">
+    <div>
+      <div class="note" style="letter-spacing:2px">NORTHLINE MARKETS / SIMULATOR</div>
+      <h1 style="margin:5px 0">Paper Trading</h1>
+      <p class="lead">Professional trading simulator · Virtual account</p>
+    </div>
+    <div class="panel" style="padding:12px 18px">
+      <span class="note">ACCOUNT STATUS</span>
+      <div style="font-weight:700;color:#35c98b">● SIMULATION ACTIVE</div>
+    </div>
+  </div>
+
+  <div class="grid g4" id="pt-sum"></div>
+
+  <div class="grid g2" style="margin-top:20px;align-items:start">
+
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2>Order Entry</h2>
+        <span class="note">MARKET ORDER</span>
+      </div>
+
+      <label for="pt-sym">Select asset</label>
+      <select id="pt-sym" style="width:100%">
+        {% for s,l in symbols.items() %}
+        <option value="{{s}}">{{l}} ({{s}})</option>
+        {% endfor %}
+      </select>
+
+      <label for="pt-qty">Share quantity</label>
+      <input id="pt-qty" type="number" value="10" min="1" step="1" style="width:100%">
+
+      <div class="panel" style="margin-top:16px;background:rgba(255,255,255,.025)">
+        <div class="note">ESTIMATED ORDER VALUE</div>
+        <div id="pt-estimate" style="font-size:25px;font-weight:700;margin-top:6px">--</div>
+        <div class="note" id="pt-order-info">Select an asset to preview your order.</div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button type="button" id="pt-buy" class="on" style="flex:1">BUY</button>
+        <button type="button" id="pt-sell" style="flex:1">SELL</button>
+      </div>
+
+      <p class="note" id="pt-msg" aria-live="polite"></p>
+
+      <button type="button" id="pt-reset" style="width:100%;margin-top:10px">
+        Reset simulated account
+      </button>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <h2>Open Positions</h2>
+        <span class="note" id="pt-position-count">0 POSITIONS</span>
+      </div>
+
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Asset</th>
+              <th class="r">Shares</th>
+              <th class="r">Avg. cost</th>
+              <th class="r">Last price</th>
+              <th class="r">Market value</th>
+              <th class="r">P/L</th>
+            </tr>
+          </thead>
+          <tbody id="pt-body"></tbody>
+        </table>
+      </div>
+      <p class="note" style="margin-top:12px">Positions are simulated and saved in this browser.</p>
+    </div>
+
+  </div>
+
+  <div class="panel" style="margin-top:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2>Trading Activity</h2>
+        <p class="note">Your recent simulated orders will appear here.</p>
+      </div>
+      <span class="note">ORDER HISTORY</span>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Side</th>
+            <th class="r">Quantity</th>
+            <th class="r">Execution price</th>
+            <th class="r">Order value</th>
+            <th class="r">Time</th>
+          </tr>
+        </thead>
+        <tbody id="pt-history">
+          <tr><td colspan="6" class="note">Your trading activity will appear here.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="note" style="margin-top:16px">
+    Paper trading uses virtual money only. Orders are simulated and do not execute in real financial markets. Market prices may be delayed or unavailable.
+  </p>
+
 </div>
+
+
 
 {% elif page == 'learn' %}
 <h1>Learn</h1><p class="lead">Read each lesson, then answer the question. Take your time: understanding risk matters more than finding a trade.</p>
@@ -475,41 +612,268 @@ if($("w-body")){
   wdraw();
 }
 
-/* ---- paper trading ---- */
-if($("pt-buy")){
-  let pt = JSON.parse(localStorage.getItem("nl-pt") || "null") || {cash: 100000, pos: {}};
-  const psave = () => localStorage.setItem("nl-pt", JSON.stringify(pt));
-  const stat = (a, b, c) => '<div class="panel q"><span>' + a + '</span><div class="p ' + (c || "") + '">' + b + "</div></div>";
-  async function pdraw(){
-    const syms = Object.keys(pt.pos); let j = {quotes: {}};
-    if(syms.length) j = await getQuotes("custom?s=" + encodeURIComponent(syms.join(",")));
-    let mv = 0, rows = "";
-    for(const s of syms){ const p = pt.pos[s], q = j.quotes[s], last = q ? q.price : p.avg, pl = (last - p.avg) * p.qty; mv += last * p.qty;
-      rows += "<tr><td><b>" + s.replace("/USD","") + '</b></td><td class="r">' + p.qty + '</td><td class="r">' + fmt(p.avg) + '</td><td class="r">' + fmt(last) + '</td><td class="r ' + cls(pl) + '">' + fmt(pl) + "</td></tr>"; }
-    $("pt-body").innerHTML = rows || '<tr><td colspan="5" class="note">No positions yet. Place your first order.</td></tr>';
-    const eq = pt.cash + mv, ret = (eq / 100000 - 1) * 100;
-    $("pt-sum").innerHTML = stat("Account value", fmt(eq)) + stat("Cash", fmt(pt.cash)) + stat("Invested", fmt(mv)) + stat("Total return", sgn(ret), cls(ret));
+
+/* ---- NORTHLINE PAPER TRADING ---- */
+if ($("pt-buy")) {
+  let pt;
+
+  try {
+    pt = JSON.parse(localStorage.getItem("nl-pt") || "null");
+  } catch (e) {
+    pt = null;
   }
-  async function trade(side){
-    const s = $("pt-sym").value, qty = Math.floor(n("pt-qty")), msg = $("pt-msg");
-    if(qty < 1){ msg.textContent = "Enter at least 1 share."; return; }
-    const j = await getQuotes("custom?s=" + encodeURIComponent(s)), q = j.quotes[s];
-    if(!q){ msg.textContent = "No price available right now. Try again in a minute."; return; }
-    const px = q.price;
-    if(side === "buy"){
-      if(px * qty > pt.cash){ msg.textContent = "Not enough cash for that order."; return; }
-      const p = pt.pos[s] || {qty: 0, avg: 0}; p.avg = (p.avg * p.qty + px * qty) / (p.qty + qty); p.qty += qty; pt.pos[s] = p; pt.cash -= px * qty;
-    } else {
-      const p = pt.pos[s]; if(!p || p.qty < qty){ msg.textContent = "You don't own that many shares."; return; }
-      p.qty -= qty; pt.cash += px * qty; if(!p.qty) delete pt.pos[s];
+
+  if (!pt || typeof pt !== "object") {
+    pt = { cash: 100000, pos: {}, history: [] };
+  }
+
+  // Preserve existing accounts and add history support.
+  pt.cash = Number(pt.cash ?? 100000);
+  pt.pos = pt.pos || {};
+  pt.history = Array.isArray(pt.history) ? pt.history : [];
+
+  const STARTING_CASH = 100000;
+  const prices = {};
+
+  const psave = () =>
+    localStorage.setItem("nl-pt", JSON.stringify(pt));
+
+  const money = value =>
+    fmt(Number(value) || 0);
+
+  const stat = (label, value, color = "") =>
+    '<div class="panel q"><span>' + label +
+    '</span><div class="p ' + color + '">' +
+    value + '</div></div>';
+
+  function message(text) {
+    if ($("pt-msg")) $("pt-msg").textContent = text;
+  }
+
+  async function getPrice(symbol) {
+    try {
+      const result = await getQuotes(
+        "custom?s=" + encodeURIComponent(symbol)
+      );
+
+      const quote = result?.quotes?.[symbol];
+
+      if (quote && Number(quote.price) > 0) {
+        prices[symbol] = Number(quote.price);
+        return prices[symbol];
+      }
+    } catch (error) {
+      console.warn("Paper trading price unavailable:", symbol);
     }
-    psave(); msg.textContent = (side === "buy" ? "Bought " : "Sold ") + qty + " " + s + " at " + fmt(px) + "."; pdraw();
+
+    return prices[symbol] || null;
   }
+
+  
+function renderHistory() {
+  const body = $("pt-history");
+  if (!body) return;
+
+  const history = pt.history.slice(0, 50);
+
+  body.innerHTML = history.length
+    ? history.map(item => {
+        const color = item.side === "BUY" ? "up" : "down";
+
+        return `
+          <tr>
+            <td><b>${item.symbol}</b></td>
+            <td class="${color}">${item.side}</td>
+            <td class="r">${item.qty}</td>
+            <td class="r">${money(item.price)}</td>
+            <td class="r">${money(item.total)}</td>
+            <td>${item.date}</td>
+          </tr>
+        `;
+      }).join("")
+    : '<tr><td colspan="6" class="note">Your trading activity will appear here.</td></tr>';
+}
+
+
+  async function pdraw() {
+    const symbols = Object.keys(pt.pos);
+    let marketValue = 0;
+    let rows = "";
+
+    // Refresh prices for current positions.
+    await Promise.all(symbols.map(getPrice));
+
+    for (const symbol of symbols) {
+      const position = pt.pos[symbol];
+      const last = prices[symbol] || position.avg;
+      const value = last * position.qty;
+      const pl = (last - position.avg) * position.qty;
+
+      marketValue += value;
+
+      rows += `
+        <tr>
+          <td><b>${symbol.replace("/USD", "")}</b></td>
+          <td class="r">${position.qty}</td>
+          <td class="r">${money(position.avg)}</td>
+          <td class="r">${money(last)}</td>
+          <td class="r">${money(value)}</td>
+          <td class="r ${cls(pl)}">${money(pl)}</td>
+        </tr>
+      `;
+    }
+
+    $("pt-body").innerHTML = rows ||
+      '<tr><td colspan="6" class="note">No open positions yet. Place a simulated order to get started.</td></tr>';
+
+    const accountValue = pt.cash + marketValue;
+    const totalReturn =
+      ((accountValue / STARTING_CASH) - 1) * 100;
+
+    $("pt-sum").innerHTML =
+      stat("Account value", money(accountValue)) +
+      stat("Available cash", money(pt.cash)) +
+      stat("Invested value", money(marketValue)) +
+      stat("Total return", sgn(totalReturn), cls(totalReturn));
+
+    const count = $("pt-position-count");
+    if (count) count.textContent = symbols.length + " open positions";
+
+    renderHistory();
+    updateEstimate();
+  }
+
+  async function updateEstimate() {
+    const symbol = $("pt-sym").value;
+    const qty = Math.floor(Number($("pt-qty").value));
+
+    const estimate = $("pt-estimate");
+    const info = $("pt-order-info");
+
+    if (!estimate || !info) return;
+
+    if (!symbol || qty < 1) {
+      estimate.textContent = "—";
+      info.textContent = "Enter a valid share quantity.";
+      return;
+    }
+
+    const price = await getPrice(symbol);
+
+    if (!price) {
+      estimate.textContent = "Unavailable";
+      info.textContent =
+        "A market price is currently unavailable. Try again when data returns.";
+      return;
+    }
+
+    estimate.textContent = money(price * qty);
+    info.textContent =
+      qty + " shares × " + money(price) + " per share";
+  }
+
+  async function trade(side) {
+    const symbol = $("pt-sym").value;
+    const qty = Math.floor(Number($("pt-qty").value));
+
+    if (!Number.isFinite(qty) || qty < 1) {
+      message("Enter a valid quantity of at least 1 share.");
+      return;
+    }
+
+    message("Checking the available market price...");
+
+    const price = await getPrice(symbol);
+
+    if (!price) {
+      message("No market price is available. Please try again later.");
+      return;
+    }
+
+    const total = price * qty;
+    const position = pt.pos[symbol];
+
+    if (side === "buy") {
+      if (total > pt.cash) {
+        message("Not enough virtual cash for this order.");
+        return;
+      }
+
+      const current = position || { qty: 0, avg: 0 };
+
+      current.avg =
+        ((current.avg * current.qty) + total) /
+        (current.qty + qty);
+
+      current.qty += qty;
+      pt.pos[symbol] = current;
+      pt.cash -= total;
+
+    } else {
+      if (!position || position.qty < qty) {
+        message("You do not own enough shares to sell.");
+        return;
+      }
+
+      position.qty -= qty;
+      pt.cash += total;
+
+      if (position.qty === 0) {
+        delete pt.pos[symbol];
+      }
+    }
+
+    pt.history.unshift({
+      date: new Date().toLocaleString(),
+      symbol,
+      side: side.toUpperCase(),
+      qty,
+      price,
+      total
+    });
+
+    pt.history = pt.history.slice(0, 50);
+
+    psave();
+
+    message(
+      side.toUpperCase() + " order completed: " +
+      qty + " shares of " + symbol +
+      " at " + money(price) + "."
+    );
+
+    await pdraw();
+  }
+
+  function resetAccount() {
+    if (!confirm(
+      "Reset your simulated account to $100,000? This clears positions and history."
+    )) return;
+
+    pt = {
+      cash: STARTING_CASH,
+      pos: {},
+      history: []
+    };
+
+    Object.keys(prices).forEach(key => delete prices[key]);
+
+    psave();
+    message("Your simulated account has been reset.");
+    pdraw();
+  }
+
   $("pt-buy").addEventListener("click", () => trade("buy"));
   $("pt-sell").addEventListener("click", () => trade("sell"));
-  $("pt-reset").addEventListener("click", () => { if(confirm("Reset to $100,000 and clear all positions?")){ pt = {cash: 100000, pos: {}}; psave(); $("pt-msg").textContent = ""; pdraw(); } });
+  $("pt-reset").addEventListener("click", resetAccount);
+
+  $("pt-sym").addEventListener("change", updateEstimate);
+  $("pt-qty").addEventListener("input", updateEstimate);
+
+  psave();
   pdraw();
 }
+
 </script>
 </body>
 </html>
