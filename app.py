@@ -165,33 +165,81 @@ def quotes(group):
     data, demo = fetch_quotes(syms)
     return jsonify({"quotes": data, "names": {s: SYMBOLS[s] for s in syms}, "demo": demo})
 
+
 @app.route("/api/history/<path:symbol>/<rng>")
 def history(symbol, rng):
     symbol = symbol.upper()
+
     if symbol not in SYMBOLS or rng not in RANGES:
         return jsonify({"error": "Unknown symbol or range"}), 400
+
     interval, bars = RANGES[rng]
     key = (symbol, rng)
+
+    # Check cached historical data.
     c = HIST_CACHE.get(key)
     if c and time.time() - c["t"] < HIST_TTL:
         return jsonify(c["d"])
+
+    # Use sample chart data if no API key is configured.
     if not API_KEY:
-        return jsonify({"values": demo_history(symbol, bars, interval != "1day"), "demo": True})
+        return jsonify({
+            "values": demo_history(symbol, bars, interval != "1day"),
+            "demo": True
+        })
+
     try:
-        r = requests.get(BASE + "/time_series", params={"symbol": symbol, "interval": interval,
-                         "outputsize": bars, "apikey": API_KEY}, timeout=10).json()
-        if "values" not in r:
-            return jsonify({"error": r.get("message", "Data unavailable")}), 502
+        response = requests.get(
+            BASE + "/time_series",
+            params={
+                "symbol": symbol,
+                "interval": interval,
+                "outputsize": bars,
+                "apikey": API_KEY
+            },
+            timeout=10
+        )
+
+        response.raise_for_status()
+        data = response.json()
+
+        # Use sample data if the API returns an error or no chart data.
+        if not isinstance(data, dict) or not data.get("values"):
+            return jsonify({
+                "values": demo_history(symbol, bars, interval != "1day"),
+                "demo": True
+            })
+
         rows = {}
-        for v in r["values"]:
+
+        for v in data["values"]:
             t = to_time(v["datetime"])
-            rows[t] = {"time": t, "open": float(v["open"]), "high": float(v["high"]),
-                       "low": float(v["low"]), "close": float(v["close"])}
-        d = {"values": [rows[k] for k in sorted(rows, key=str)], "demo": False}
-        HIST_CACHE[key] = {"d": d, "t": time.time()}
-        return jsonify(d)
-    except (requests.RequestException, ValueError):
-        return jsonify({"error": "Market data service unavailable"}), 502
+
+            rows[t] = {
+                "time": t,
+                "open": float(v["open"]),
+                "high": float(v["high"]),
+                "low": float(v["low"]),
+                "close": float(v["close"])
+            }
+
+        result = {
+            "values": [rows[k] for k in sorted(rows)],
+            "demo": False
+        }
+
+        HIST_CACHE[key] = {
+            "d": result,
+            "t": time.time()
+        }
+
+        return jsonify(result)
+
+    except (requests.RequestException, ValueError, TypeError, KeyError):
+        return jsonify({
+            "values": demo_history(symbol, bars, interval != "1day"),
+            "demo": True
+        })
 
 def page(name):
     return render_template_string(HTML, page=name, pages=PAGES, lessons=LESSONS, glossary=GLOSSARY,
