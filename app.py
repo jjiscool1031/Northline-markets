@@ -18,7 +18,19 @@ STOCKS = ["SPY", "QQQ", "DIA", "AAPL", "MSFT", "NVDA", "AMZN", "TSLA"]
 DEMO_BASE = {"SPY": 590, "QQQ": 510, "DIA": 430, "AAPL": 230, "MSFT": 430, "NVDA": 140, "AMZN": 200,
              "TSLA": 330, "XAU/USD": 2650, "XAG/USD": 31, "XPT/USD": 960, "XPD/USD": 980, "GLD": 245, "SLV": 28}
 RANGES = {  # label: (interval, bars)
-    "1D": ("5min", 78), "1W": ("30min", 65), "1M": ("1day", 22), "3M": ("1day", 66), "1Y": ("1day", 252)}
+    "1D": ("5min", 78),
+    "1W": ("30min", 65),
+    "1M": ("1day", 22),
+    "3M": ("1day", 66),
+    "1Y": ("1day", 252),
+
+    # Shorter viewing ranges (DEMO)
+    "1H": ("1min", 60),
+    "5m": ("demo_5sec", 60),
+    "1m": ("demo_1sec", 60),
+    "30s": ("demo_1sec", 30),
+    "1s": ("demo_1sec", 1)
+}
 
 QUOTE_CACHE, HIST_CACHE = {}, {}
 QUOTE_TTL, HIST_TTL = 60, 300
@@ -136,22 +148,46 @@ def fetch_quotes(symbols):
     return out, used_demo
 
 
-def demo_history(sym, bars, intraday):
-    rnd = random.Random(sym)
-    price, rows, step = DEMO_BASE.get(sym, 100) * 0.92, [], 300 if intraday else 86400
+def demo_history(sym, bars, step):
+    rnd = random.Random(f"{sym}:{step}")
+    price = DEMO_BASE.get(sym, 100) * 0.92
+    rows = []
+
+    if step <= 1:
+        volatility = 0.0005
+    elif step <= 5:
+        volatility = 0.0008
+    elif step <= 60:
+        volatility = 0.001
+    elif step < 86400:
+        volatility = 0.002
+    else:
+        volatility = 0.012
+
     t = int(time.time()) // step * step - bars * step
+
     for _ in range(bars):
         o = price
-        c = o * (1 + rnd.uniform(-0.012, 0.0125))
-        rows.append({"time": t, "open": round(o, 2), "high": round(max(o, c) * 1.004, 2),
-                     "low": round(min(o, c) * 0.996, 2), "close": round(c, 2)})
+        c = o * (1 + rnd.uniform(-volatility, volatility))
+
+        rows.append({
+            "time": t,
+            "open": round(o, 2),
+            "high": round(max(o, c) * (1 + volatility * 0.35), 2),
+            "low": round(min(o, c) * (1 - volatility * 0.35), 2),
+            "close": round(c, 2)
+        })
+
         price, t = c, t + step
+
     return rows
+
 
 def to_time(s):
     if len(s) <= 10:
         return s
     return int(datetime.strptime(s, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp())
+
 
 # ---------------- routes ----------------
 @app.route("/api/quotes/<group>")
@@ -176,15 +212,26 @@ def history(symbol, rng):
     interval, bars = RANGES[rng]
     key = (symbol, rng)
 
-    # Check cached historical data.
+    demo_steps = {
+        "1min": 60,
+        "5min": 300,
+        "30min": 1800,
+        "1day": 86400,
+        "demo_5sec": 5,
+        "demo_1sec": 1
+    }
+
+    step = demo_steps[interval]
+    demo_only = interval.startswith("demo_")
+
     c = HIST_CACHE.get(key)
     if c and time.time() - c["t"] < HIST_TTL:
         return jsonify(c["d"])
 
-    # Use sample chart data if no API key is configured.
-    if not API_KEY:
+    # Use DEMO data when the API is unavailable or the range is demo-only.
+    if not API_KEY or demo_only:
         return jsonify({
-            "values": demo_history(symbol, bars, interval != "1day"),
+            "values": demo_history(symbol, bars, step),
             "demo": True
         })
 
@@ -203,10 +250,9 @@ def history(symbol, rng):
         response.raise_for_status()
         data = response.json()
 
-        # Use sample data if the API returns an error or no chart data.
         if not isinstance(data, dict) or not data.get("values"):
             return jsonify({
-                "values": demo_history(symbol, bars, interval != "1day"),
+                "values": demo_history(symbol, bars, step),
                 "demo": True
             })
 
@@ -237,7 +283,7 @@ def history(symbol, rng):
 
     except (requests.RequestException, ValueError, TypeError, KeyError):
         return jsonify({
-            "values": demo_history(symbol, bars, interval != "1day"),
+            "values": demo_history(symbol, bars, step),
             "demo": True
         })
 
@@ -1153,7 +1199,7 @@ CHART_HTML = """
   {% for s,l in symbols.items() %}<option value="{{s}}" {{'selected' if (page=='metals' and s=='XAU/USD') or (page!='metals' and s=='SPY')}}>{{l}} ({{s}})</option>{% endfor %}
  </select>
  <button type="button" id="sma-btn" class="on">20-period average</button>
- <div class="tf">{% for r in ['1D','1W','1M','3M','1Y'] %}<button type="button" data-r="{{r}}" class="{{'on' if r=='3M'}}">{{r}}</button>{% endfor %}</div>
+  <div class="tf">{% for r in ['1s','30s','1m','5m','1H','1D','1W','1M','3M','1Y'] %}<button type="button" data-r="{{r}}" class="{{'on' if r=='3M'}}">{{r}}</button>{% endfor %}</div>
 
  <div class="chart-status-wrap">
   <button type="button" id="chart-status" class="chart-status demo" aria-expanded="false">
