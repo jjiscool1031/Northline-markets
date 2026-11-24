@@ -296,6 +296,65 @@ main{padding:34px 0 50px}
 .q .c{font-size:13px}.up{color:var(--up)}.down{color:var(--down)}
 .metal{border-top:3px solid var(--gold)}.metal.ag{border-top-color:var(--silver)}
 .chartbar{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
+/* LIVE / DEMO chart status */
+.chart-status-wrap{
+  position:relative;
+  margin-left:auto;
+}
+
+.chart-status{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:1px;
+  padding:8px 12px;
+  border-radius:20px;
+}
+
+.chart-status.demo{
+  color:var(--gold);
+  border-color:var(--gold);
+}
+
+.chart-status.live{
+  color:var(--up);
+  border-color:var(--up);
+}
+
+.status-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:currentColor;
+}
+
+.chart-status-menu{
+  position:absolute;
+  top:calc(100% + 8px);
+  right:0;
+  z-index:20;
+  width:250px;
+  padding:14px;
+  background:#202833;
+  border:1px solid var(--line);
+  border-radius:8px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+}
+
+.chart-status-menu strong{
+  display:block;
+  margin-bottom:5px;
+  font-size:13px;
+}
+
+.chart-status-menu p{
+  margin:0;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.5;
+}
 select,input,button{font:inherit;background:#0f1318;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 12px}
 button{cursor:pointer}button:hover{border-color:var(--gold)}button.on{background:var(--gold);color:#1a1405;border-color:var(--gold)}
 .tf{display:flex;gap:6px}
@@ -572,39 +631,191 @@ function card(s, j){
   }
 })();
 
+
 /* ---- chart ---- */
 const el = $("trading-chart");
+
 if(el && window.LightweightCharts){
-  const chart = LightweightCharts.createChart(el, {width: el.clientWidth, height: 380,
-    layout: {background: {color: "#171d25"}, textColor: "#98a1ad"},
-    grid: {vertLines: {color: "#222a34"}, horzLines: {color: "#222a34"}},
-    rightPriceScale: {borderColor: "#2a323d"}, timeScale: {borderColor: "#2a323d", timeVisible: true}});
-  const series = chart.addCandlestickSeries({upColor: "#43b88c", downColor: "#e26a63", borderVisible: false,
-    wickUpColor: "#43b88c", wickDownColor: "#e26a63"});
-  let sym = $("chart-symbol").value, rng = "3M", smaOn = true, vals = [];
-  const sma = chart.addLineSeries({color: "#d9a93f", lineWidth: 2, priceLineVisible: false, lastValueVisible: false});
+  const chart = LightweightCharts.createChart(el, {
+    width: el.clientWidth,
+    height: 380,
+    layout: {
+      background: {color: "#171d25"},
+      textColor: "#98a1ad"
+    },
+    grid: {
+      vertLines: {color: "#222a34"},
+      horzLines: {color: "#222a34"}
+    },
+    rightPriceScale: {borderColor: "#2a323d"},
+    timeScale: {borderColor: "#2a323d", timeVisible: true}
+  });
+
+  const series = chart.addCandlestickSeries({
+    upColor: "#43b88c",
+    downColor: "#e26a63",
+    borderVisible: false,
+    wickUpColor: "#43b88c",
+    wickDownColor: "#e26a63"
+  });
+
+  let sym = $("chart-symbol").value;
+  let rng = "3M";
+  let smaOn = true;
+  let vals = [];
+
+  const sma = chart.addLineSeries({
+    color: "#d9a93f",
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
+
+  // Update LIVE / DEMO indicator
+  function setChartStatus(isDemo){
+    const button = $("chart-status");
+    const label = $("chart-status-label");
+    const title = $("chart-source-title");
+    const description = $("chart-source-description");
+
+    if(!button || !label) return;
+
+    button.classList.toggle("demo", isDemo);
+    button.classList.toggle("live", !isDemo);
+
+    label.textContent = isDemo ? "DEMO" : "LIVE";
+
+    if(title){
+      title.textContent = isDemo
+        ? "Demo prices"
+        : "Live market data";
+    }
+
+    if(description){
+      description.textContent = isDemo
+        ? "Using simulated sample prices because live market data is unavailable."
+        : "Chart data was successfully retrieved from the configured market data provider. Data may be delayed.";
+    }
+
+    
+
+  }
+
+  // Open and close the status dropdown
+  const statusButton = $("chart-status");
+  const statusMenu = $("chart-status-menu");
+
+  if(statusButton && statusMenu){
+    statusButton.addEventListener("click", () => {
+      const isOpen = statusButton.getAttribute("aria-expanded") === "true";
+      statusButton.setAttribute("aria-expanded", String(!isOpen));
+      statusMenu.hidden = isOpen;
+    });
+
+    document.addEventListener("click", event => {
+      if(!event.target.closest(".chart-status-wrap")){
+        statusMenu.hidden = true;
+        statusButton.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+
   function drawSma(){
-    if(!smaOn){ sma.setData([]); return; }
-    const o = []; for(let i = 19; i < vals.length; i++){ let t = 0; for(let k = i - 19; k <= i; k++) t += vals[k].close; o.push({time: vals[i].time, value: t / 20}); }
+    if(!smaOn){
+      sma.setData([]);
+      return;
+    }
+
+    const o = [];
+
+    for(let i = 19; i < vals.length; i++){
+      let t = 0;
+
+      for(let k = i - 19; k <= i; k++){
+        t += vals[k].close;
+      }
+
+      o.push({
+        time: vals[i].time,
+        value: t / 20
+      });
+    }
+
     sma.setData(o);
   }
+
   async function load(){
     $("chart-msg").textContent = "Loading chart";
-    try{ const r = await fetch("/api/history/" + sym + "/" + rng); const j = await r.json();
-      if(!j.values){ series.setData([]); $("chart-msg").textContent = j.error || "Chart data unavailable. Try again in a minute."; return; }
-      if(j.demo) $("demo-banner").hidden = false;
-      vals = j.values; const f = vals[0], l = vals[vals.length - 1], pc = (l.close / f.open - 1) * 100;
-      $("chart-head").innerHTML = fmt(l.close) + ' <small class="' + cls(pc) + '">' + sgn(pc) + " over this range</small>";
-      series.setData(vals); drawSma(); chart.timeScale().fitContent(); $("chart-msg").textContent = "";
-    }catch(e){ $("chart-msg").textContent = "Could not load the chart."; }
+
+    try{
+      const r = await fetch("/api/history/" + encodeURIComponent(sym) + "/" + rng);
+      const j = await r.json();
+
+      if(!j.values || !j.values.length){
+        series.setData([]);
+        $("chart-msg").textContent =
+          j.error || "Chart data unavailable. Try again in a minute.";
+        return;
+      }
+
+      setChartStatus(Boolean(j.demo));
+
+      vals = j.values;
+
+      const f = vals[0];
+      const l = vals[vals.length - 1];
+      const pc = (l.close / f.open - 1) * 100;
+
+      $("chart-head").innerHTML =
+        fmt(l.close) +
+        ' <small class="' + cls(pc) + '">' +
+        sgn(pc) + " over this range</small>";
+
+      series.setData(vals);
+      drawSma();
+
+      chart.timeScale().fitContent();
+      $("chart-msg").textContent = "";
+
+    }catch(e){
+      $("chart-msg").textContent = "Could not load the chart.";
+      $("chart-status-label").textContent = "UNAVAILABLE";
+      $("chart-source-title").textContent = "Data unavailable";
+      $("chart-source-description").textContent =
+        "The chart could not reach the market data service.";
+    }
   }
-  $("chart-symbol").addEventListener("change", e => { sym = e.target.value; load(); });
-  document.querySelectorAll(".tf button").forEach(b => b.addEventListener("click", () => {
-    document.querySelectorAll(".tf button").forEach(x => x.classList.remove("on")); b.classList.add("on"); rng = b.dataset.r; load(); }));
-  addEventListener("resize", () => chart.applyOptions({width: el.clientWidth}));
-  $("sma-btn").addEventListener("click", () => { smaOn = !smaOn; $("sma-btn").classList.toggle("on", smaOn); drawSma(); });
+
+  $("chart-symbol").addEventListener("change", e => {
+    sym = e.target.value;
+    load();
+  });
+
+  document.querySelectorAll(".tf button").forEach(b => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll(".tf button").forEach(x =>
+        x.classList.remove("on")
+      );
+
+      b.classList.add("on");
+      rng = b.dataset.r;
+      load();
+    });
+  });
+
+  addEventListener("resize", () => {
+    chart.applyOptions({width: el.clientWidth});
+  });
+
+  $("sma-btn").addEventListener("click", () => {
+    smaOn = !smaOn;
+    $("sma-btn").classList.toggle("on", smaOn);
+    drawSma();
+  });
+
   load();
 }
+
 
 /* ---- lessons ---- */
 const done = JSON.parse(localStorage.getItem("nl-done") || "[]");
@@ -943,13 +1154,28 @@ CHART_HTML = """
  </select>
  <button type="button" id="sma-btn" class="on">20-period average</button>
  <div class="tf">{% for r in ['1D','1W','1M','3M','1Y'] %}<button type="button" data-r="{{r}}" class="{{'on' if r=='3M'}}">{{r}}</button>{% endfor %}</div>
+
+ <div class="chart-status-wrap">
+  <button type="button" id="chart-status" class="chart-status demo" aria-expanded="false">
+   <span class="status-dot"></span>
+   <span id="chart-status-label">DEMO</span>
+   <span class="status-arrow">▾</span>
+  </button>
+  <div id="chart-status-menu" class="chart-status-menu" hidden>
+   <strong id="chart-source-title">Demo prices</strong>
+   <p id="chart-source-description">Using simulated market data for learning.</p>
+  </div>
+ </div>
 </div>
+
 <div id="chart-head"></div>
 <div id="trading-chart" style="width:100%;height:380px"></div>
 <p class="note" id="chart-msg"></p>
 """
+
 # Inline the chart block wherever {% include_chart %} appears
 HTML = HTML.replace("{% include_chart %}", CHART_HTML)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    
