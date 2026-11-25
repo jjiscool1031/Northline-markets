@@ -87,10 +87,15 @@ PAGES = [("home", "/", "Overview"), ("stocks", "/stocks", "Stocks"), ("metals", 
 # ---------------- data helpers ----------------
 def demo_quote(sym):
     base = DEMO_BASE.get(sym, 100)
-    rnd = random.Random(sym + datetime.now().strftime("%Y%m%d%H"))
-    pct = rnd.uniform(-1.5, 1.5)
-    return {"price": round(base * (1 + pct / 100), 2), "pct": round(pct, 2)}
+    now = int(time.time() // 60)
 
+    rnd = random.Random(f"{sym}:{now}")
+    pct = rnd.uniform(-0.08, 0.08)
+
+    return {
+        "price": round(base * (1 + pct / 100), 2),
+        "pct": round(pct, 2)
+    }
 
 def fetch_quotes(symbols):
     now, out, missing = time.time(), {}, []
@@ -150,20 +155,24 @@ def fetch_quotes(symbols):
 
 
 def demo_history(sym, bars, step):
-    rnd = random.Random(f"{sym}:{step}:{int(time.time()) // step}")
-    price = DEMO_BASE.get(sym, 100) * 0.92
+    # Keep demo candle patterns stable throughout the day.
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    rnd = random.Random(f"{sym}:{step}:{day}")
+
+    price = DEMO_BASE.get(sym, 100)
     rows = []
 
+    # Smaller movements for more realistic demo candles.
     if step <= 1:
-        volatility = 0.0005
+        volatility = 0.00008
     elif step <= 5:
-        volatility = 0.0008
+        volatility = 0.00015
     elif step <= 60:
-        volatility = 0.001
+        volatility = 0.0003
     elif step < 86400:
-        volatility = 0.002
+        volatility = 0.0008
     else:
-        volatility = 0.012
+        volatility = 0.008
 
     t = int(time.time()) // step * step - bars * step
 
@@ -174,12 +183,13 @@ def demo_history(sym, bars, step):
         rows.append({
             "time": t,
             "open": round(o, 2),
-            "high": round(max(o, c) * (1 + volatility * 0.35), 2),
-            "low": round(min(o, c) * (1 - volatility * 0.35), 2),
+            "high": round(max(o, c) * (1 + volatility * 0.2), 2),
+            "low": round(min(o, c) * (1 - volatility * 0.2), 2),
             "close": round(c, 2)
         })
 
-        price, t = c, t + step
+        price = c
+        t += step
 
     return rows
 
