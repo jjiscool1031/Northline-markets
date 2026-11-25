@@ -25,11 +25,12 @@ RANGES = {  # label: (interval, bars)
     "1Y": ("1day", 252),
 
     # Shorter viewing ranges (DEMO)
-    "1H": ("1min", 60),
-    "5m": ("demo_5sec", 60),
-    "1m": ("demo_1sec", 60),
-    "30s": ("demo_1sec", 30),
-    "1s": ("demo_1sec", 1)
+   # Shorter viewing ranges (DEMO)
+"1H": ("1min", 60),
+"5m": ("demo_5sec", 120),
+"1m": ("demo_1sec", 120),
+"30s": ("demo_1sec", 120),
+"1s": ("demo_1sec", 120)
 }
 
 QUOTE_CACHE, HIST_CACHE = {}, {}
@@ -149,7 +150,7 @@ def fetch_quotes(symbols):
 
 
 def demo_history(sym, bars, step):
-    rnd = random.Random(f"{sym}:{step}")
+    rnd = random.Random(f"{sym}:{step}:{int(time.time()) // step}")
     price = DEMO_BASE.get(sym, 100) * 0.92
     rows = []
 
@@ -694,7 +695,14 @@ if(el && window.LightweightCharts){
       horzLines: {color: "#222a34"}
     },
     rightPriceScale: {borderColor: "#2a323d"},
-    timeScale: {borderColor: "#2a323d", timeVisible: true}
+    timeScale: {
+  borderColor: "#2a323d",
+  timeVisible: true,
+  secondsVisible: true,
+  barSpacing: 12,
+  rightOffset: 5,
+  minBarSpacing: 6
+}
   });
 
   const series = chart.addCandlestickSeries({
@@ -820,7 +828,10 @@ if(el && window.LightweightCharts){
       series.setData(vals);
       drawSma();
 
-      chart.timeScale().fitContent();
+      chart.timeScale().applyOptions({
+  barSpacing: 12,
+  rightOffset: 5
+});
       $("chart-msg").textContent = "";
 
     }catch(e){
@@ -859,7 +870,13 @@ if(el && window.LightweightCharts){
     drawSma();
   });
 
-  load();
+    load();
+
+  setInterval(() => {
+    if (rng === "1s") {
+      load();
+    }
+  }, 1000);
 }
 
 
