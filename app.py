@@ -87,10 +87,12 @@ PAGES = [("home", "/", "Overview"), ("stocks", "/stocks", "Stocks"), ("metals", 
 # ---------------- data helpers ----------------
 def demo_quote(sym):
     base = DEMO_BASE.get(sym, 100)
-    now = int(time.time() // 60)
 
-    rnd = random.Random(f"{sym}:{now}")
-    pct = rnd.uniform(-0.08, 0.08)
+    # Generate a new small price movement every 10 seconds.
+    interval = int(time.time() // 10)
+    rnd = random.Random(f"{sym}:{interval}")
+
+    pct = rnd.uniform(-0.05, 0.05)
 
     return {
         "price": round(base * (1 + pct / 100), 2),
@@ -687,8 +689,58 @@ function card(s, j){
     if($("home-q")) $("home-q").innerHTML = ["XAU/USD","XAG/USD"].map(x => card(x, j)).join("") + await (async () => { const k = await getQuotes("stocks"); return ["SPY","QQQ"].map(x => card(x, k)).join(""); })();
   }
 })();
+/* ---- automatic market table refresh ---- */
+async function refreshMarketTables(){
+  for(const tb of document.querySelectorAll("table[data-group]")){
+    const j = await getQuotes(tb.dataset.group);
 
+    tb.innerHTML =
+      '<thead><tr><th>Symbol</th><th>Name</th><th class="r">Price</th><th class="r">Change</th></tr></thead><tbody>' +
+      Object.keys(j.names).map(s => {
+        const q = j.quotes[s];
 
+        return '<tr data-s="' + s + '">' +
+          '<td><b>' + s.replace("/USD","") + '</b></td>' +
+          '<td>' + j.names[s] + '</td>' +
+          '<td class="r">' + (q ? fmt(q.price) : "n/a") + '</td>' +
+          '<td class="r ' + (q ? cls(q.pct) : "") + '">' +
+          (q ? sgn(q.pct) : "") + '</td></tr>';
+      }).join("") +
+      '</tbody>';
+
+    tb.querySelectorAll("tr[data-s]").forEach(r => {
+      r.addEventListener("click", () => {
+        const sel = $("chart-symbol");
+        if(!sel) return;
+
+        sel.value = r.dataset.s;
+        sel.dispatchEvent(new Event("change"));
+        sel.scrollIntoView({behavior:"smooth", block:"center"});
+      });
+    });
+  }
+}
+
+setInterval(refreshMarketTables, 10000);
+/* ---- automatic ticker refresh ---- */
+async function refreshTicker(){
+  const t = await getQuotes("ticker");
+
+  const items = Object.keys(t.quotes).map(s =>
+    '<span class="tk"><b>' +
+    s.replace("/USD","") +
+    "</b>" +
+    fmt(t.quotes[s].price) +
+    ' <small class="' + cls(t.quotes[s].pct) + '">' +
+    sgn(t.quotes[s].pct) +
+    "</small></span>"
+  ).join("");
+
+  $("ticker").innerHTML =
+    '<div class="track">' + items + items + "</div>";
+}
+
+setInterval(refreshTicker, 10000);
 /* ---- chart ---- */
 const el = $("trading-chart");
 
