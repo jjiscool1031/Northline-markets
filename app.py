@@ -80,10 +80,59 @@ GLOSSARY = [
  ("Troy ounce", "The unit for precious metals: 31.1035 grams, heavier than a regular ounce."),
  ("Volatility", "How much and how fast a price moves."),
 ]
-PAGES = [("home", "/", "Overview"), ("stocks", "/stocks", "Stocks"), ("metals", "/metals", "Precious metals"),
-         ("watch", "/watchlist", "Watchlist"), ("paper", "/paper-trading", "Paper trading"),
-         ("learn", "/learn", "Learn"), ("tools", "/tools", "Tools"), ("glossary", "/glossary", "Glossary")]
-
+NEWS_ITEMS = [
+    {
+        "id": "demo-001",
+        "category": "Markets",
+        "time": "Just now",
+        "headline": "Major indexes edge higher in a simulated market rebound",
+        "summary": "In this fictional scenario, broad-market benchmarks move modestly higher as market participants assess the economic outlook.",
+        "breaking": True
+    },
+    {
+        "id": "demo-002",
+        "category": "Technology",
+        "time": "12 min ago",
+        "headline": "Technology shares show mixed movement in simulated trading",
+        "summary": "This hypothetical update explores how changing expectations can influence technology-sector sentiment.",
+        "breaking": False
+    },
+    {
+        "id": "demo-003",
+        "category": "Commodities",
+        "time": "24 min ago",
+        "headline": "Gold holds steady in a fictional market update",
+        "summary": "A simulated precious-metals report examines how interest-rate expectations and currency movements can affect gold.",
+        "breaking": False
+    },
+    {
+        "id": "demo-004",
+        "category": "Economy",
+        "time": "38 min ago",
+        "headline": "Investors assess a hypothetical economic data release",
+        "summary": "This educational scenario demonstrates why economic reports can influence expectations across financial markets.",
+        "breaking": False
+    },
+    {
+        "id": "demo-005",
+        "category": "Markets",
+        "time": "51 min ago",
+        "headline": "Trading activity increases in a simulated afternoon session",
+        "summary": "A fictional market scenario examines the relationship between trading volume and short-term price movements.",
+        "breaking": False
+    }
+]
+PAGES = [
+    ("home", "/", "Overview"),
+    ("stocks", "/stocks", "Stocks"),
+    ("metals", "/metals", "Precious metals"),
+    ("news", "/news", "News"),
+    ("watch", "/watchlist", "Watchlist"),
+    ("paper", "/paper-trading", "Paper trading"),
+    ("learn", "/learn", "Learn"),
+    ("tools", "/tools", "Tools"),
+    ("glossary", "/glossary", "Glossary")
+]
 # ---------------- data helpers ----------------
 def demo_quote(sym):
     base = DEMO_BASE.get(sym, 100)
@@ -299,7 +348,9 @@ def history(symbol, rng):
             "values": demo_history(symbol, bars, step),
             "demo": True
         })
-
+@app.route("/api/news")
+def news_api():
+    return jsonify({"demo": True, "items": NEWS_ITEMS})
 def page(name):
     return render_template_string(HTML, page=name, pages=PAGES, lessons=LESSONS, glossary=GLOSSARY,
                                   symbols=SYMBOLS, stocks=STOCKS, metals=METALS)
@@ -310,6 +361,9 @@ def home(): return page("home")
 def stocks_page(): return page("stocks")
 @app.route("/metals")
 def metals_page(): return page("metals")
+
+@app.route("/news")
+def news_page(): return page("news")
 @app.route("/learn")
 def learn_page(): return page("learn")
 @app.route("/tools")
@@ -439,6 +493,139 @@ footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--muted);f
 .tbl td{padding:12px 16px;border-bottom:1px solid #1f2630}.tbl tr[data-s]{cursor:pointer}.tbl tr[data-s]:hover{background:#1c2430}
 .tbl .r{text-align:right;font-variant-numeric:tabular-nums}
 #chart-head{font:600 26px Fraunces,Georgia,serif;margin-bottom:8px}#chart-head small{font:500 14px Inter,Arial,sans-serif}
+/* ---- PROFESSIONAL NEWS PAGE ---- */
+.news-feed{
+  display:grid;
+  gap:14px;
+  max-width:900px;
+}
+
+.news-card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:9px;
+  padding:20px;
+  transition:border-color .2s,transform .2s;
+}
+
+.news-card:hover{
+  border-color:#657184;
+  transform:translateY(-2px);
+}
+
+.news-card-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-bottom:12px;
+}
+
+.news-category{
+  color:var(--gold);
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:1.2px;
+  text-transform:uppercase;
+}
+
+.news-time{
+  color:var(--muted);
+  font-size:12px;
+}
+
+.news-card h2{
+  font:600 21px Fraunces,Georgia,serif;
+  margin:0 0 9px;
+}
+
+.news-card p{
+  color:var(--muted);
+  margin:0;
+  line-height:1.7;
+}
+
+.news-label{
+  display:inline-block;
+  color:var(--gold);
+  border:1px solid #66501d;
+  border-radius:4px;
+  padding:3px 7px;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:1px;
+  margin-bottom:10px;
+}
+
+.news-breaking{
+  border-left:3px solid var(--gold);
+}
+
+/* ---- BREAKING NEWS POPUP ---- */
+.breaking-toast-wrap{
+  position:fixed;
+  top:20px;
+  right:20px;
+  z-index:9999;
+  width:min(380px,calc(100vw - 40px));
+}
+
+.breaking-toast{
+  background:#202833;
+  border:1px solid var(--gold);
+  border-left:4px solid var(--gold);
+  border-radius:9px;
+  padding:18px;
+  box-shadow:0 12px 35px rgba(0,0,0,.55);
+  animation:toast-in .35s ease-out;
+}
+
+.breaking-toast[hidden]{
+  display:none;
+}
+
+.breaking-toast-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:12px;
+}
+
+.breaking-toast-top strong{
+  color:var(--gold);
+  font-size:11px;
+  letter-spacing:1.2px;
+}
+
+.breaking-toast-top button{
+  padding:2px 9px;
+  font-size:20px;
+  line-height:1.2;
+}
+
+#breaking-headline{
+  font:600 19px Fraunces,Georgia,serif;
+  margin-bottom:8px;
+}
+
+#breaking-summary{
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.6;
+  margin:0;
+}
+
+@keyframes toast-in{
+  from{opacity:0;transform:translateY(-12px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+@media(max-width:520px){
+  .news-card{padding:16px}
+  .news-card h2{font-size:19px}
+}
 </style>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
@@ -448,6 +635,19 @@ footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--muted);f
  <nav aria-label="Main">{% for k,u,l in pages %}<a href="{{u}}" class="{{'on' if k==page}}">{{l}}</a>{% endfor %}</nav></div>
  <div class="ticker" id="ticker" aria-label="Live prices"></div>
 </div></header>
+
+<!-- SIMULATED BREAKING NEWS POPUP -->
+<div class="breaking-toast-wrap">
+  <div id="breaking-toast" class="breaking-toast" hidden role="status">
+    <div class="breaking-toast-top">
+      <strong>SIMULATED BREAKING NEWS</strong>
+      <button type="button" id="breaking-dismiss" aria-label="Dismiss">×</button>
+    </div>
+    <div id="breaking-headline"></div>
+    <p id="breaking-summary"></p>
+  </div>
+</div>
+
 <main><div class="wrap">
 <div id="demo-banner" class="banner" hidden>
   Showing sample prices because live market data is unavailable. Prices are for demonstration only.
@@ -480,12 +680,25 @@ footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--muted);f
  <div class="panel"><h2>Before you buy</h2><p class="note">Coins and bars sell above spot (the premium) and dealers buy below it. Compare total cost, storage and insurance. ETFs such as GLD and SLV are a no-storage alternative.</p></div>
 </div>
 <div class="panel" style="margin-top:16px"><h2>Chart</h2>{% include_chart %}</div>
+{% elif page == 'news' %}
+<h1>Market News</h1>
+<p class="lead">Market-style headlines and educational scenarios covering stocks, technology, commodities, and the economy.</p>
 
+<div class="banner">
+  SIMULATED NEWS — These are fictional examples for educational purposes, not actual market reports.
+</div>
+
+<div id="news-feed" class="news-feed"></div>
 {% elif page == 'watch' %}
 <h1>Watchlist</h1><p class="lead">Track the symbols you care about. Your list is saved in this browser.</p>
 <div class="panel"><div class="chartbar"><select id="w-sel" aria-label="Symbol">{% for s,l in symbols.items() %}<option value="{{s}}">{{l}} ({{s}})</option>{% endfor %}</select><button type="button" id="w-add" class="on">Add to watchlist</button></div>
 <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Symbol</th><th>Name</th><th class="r">Price</th><th class="r">Change</th><th></th></tr></thead><tbody id="w-body"></tbody></table></div><p class="note" id="w-empty"></p></div>
 
+
+<div class="panel" style="margin-top:16px">
+  <h2>Selected Asset Chart</h2>
+  {% include_chart %}
+</div>
 
 {% elif page == 'paper' %}
 <div class="paper-terminal">
@@ -989,20 +1202,73 @@ if($("gsearch")) $("gsearch").addEventListener("input", e => {
   $("mkt").textContent = open ? "NYSE open" : "NYSE closed"; $("mkt").className = "pill " + (open ? "up" : "down");
 })();
 
+
 /* ---- watchlist ---- */
 if($("w-body")){
   let wl = JSON.parse(localStorage.getItem("nl-watch") || '["SPY","AAPL","XAU/USD","XAG/USD"]');
+
   const wsave = () => localStorage.setItem("nl-watch", JSON.stringify(wl));
+
   async function wdraw(){
-    if(!wl.length){ $("w-body").innerHTML = ""; $("w-empty").textContent = "Your watchlist is empty. Add a symbol above."; return; }
+    if(!wl.length){
+      $("w-body").innerHTML = "";
+      $("w-empty").textContent = "Your watchlist is empty. Add a symbol above.";
+      return;
+    }
+
     $("w-empty").textContent = "";
+
     const j = await getQuotes("custom?s=" + encodeURIComponent(wl.join(",")));
-    $("w-body").innerHTML = wl.map(s => { const q = j.quotes[s];
-      return "<tr><td><b>" + s + "</b></td><td>" + (j.names[s] || "") + '</td><td class="r">' + (q ? fmt(q.price) : "n/a") + '</td><td class="r ' + (q ? cls(q.pct) : "") + '">' + (q ? sgn(q.pct) : "") + '</td><td class="r"><button type="button" data-x="' + s + '">Remove</button></td></tr>'; }).join("");
-    $("w-body").querySelectorAll("[data-x]").forEach(b => b.addEventListener("click", () => { wl = wl.filter(x => x !== b.dataset.x); wsave(); wdraw(); }));
+
+    $("w-body").innerHTML = wl.map(s => {
+      const q = j.quotes[s];
+
+      return '<tr data-s="' + s + '">' +
+        '<td><b>' + s.replace("/USD","") + '</b></td>' +
+        '<td>' + (j.names[s] || "") + '</td>' +
+        '<td class="r">' + (q ? fmt(q.price) : "n/a") + '</td>' +
+        '<td class="r ' + (q ? cls(q.pct) : "") + '">' +
+        (q ? sgn(q.pct) : "") + '</td>' +
+        '<td class="r"><button type="button" data-x="' + s + '">Remove</button></td>' +
+        '</tr>';
+    }).join("");
+
+    $("w-body").querySelectorAll("tr[data-s]").forEach(r => {
+      r.addEventListener("click", e => {
+        if(e.target.closest("button")) return;
+
+        const sel = $("chart-symbol");
+        if(!sel) return;
+
+        sel.value = r.dataset.s;
+        sel.dispatchEvent(new Event("change"));
+        sel.scrollIntoView({behavior:"smooth", block:"center"});
+      });
+    });
+
+    $("w-body").querySelectorAll("[data-x]").forEach(b => {
+      b.addEventListener("click", () => {
+        wl = wl.filter(x => x !== b.dataset.x);
+        wsave();
+        wdraw();
+      });
+    });
   }
-  $("w-add").addEventListener("click", () => { const s = $("w-sel").value; if(!wl.includes(s) && wl.length < 12){ wl.push(s); wsave(); wdraw(); } });
+
+  $("w-add").addEventListener("click", () => {
+    const s = $("w-sel").value;
+
+    if(!wl.includes(s) && wl.length < 12){
+      wl.push(s);
+      wsave();
+      wdraw();
+    }
+  });
+
   wdraw();
+
+  // Refresh watchlist prices every 10 seconds.
+  setInterval(wdraw, 10000);
 }
 
 
@@ -1266,7 +1532,122 @@ function renderHistory() {
   psave();
   pdraw();
 }
+/* ---- SIMULATED MARKET NEWS ---- */
+(function(){
+  const feed = $("news-feed");
+  const toast = $("breaking-toast");
+  const headline = $("breaking-headline");
+  const summary = $("breaking-summary");
+  const dismiss = $("breaking-dismiss");
 
+  let activeNewsId = null;
+
+  function getSeenNews(){
+    try{
+      return JSON.parse(localStorage.getItem("nl-news-seen") || "[]");
+    }catch(e){
+      return [];
+    }
+  }
+
+  function markNewsSeen(id){
+    const seen = getSeenNews();
+
+    if(!seen.includes(id)){
+      seen.push(id);
+
+      try{
+        localStorage.setItem("nl-news-seen", JSON.stringify(seen));
+      }catch(e){}
+    }
+  }
+
+  function createNewsCard(item){
+    const article = document.createElement("article");
+    article.className = "news-card";
+
+    if(item.breaking){
+      article.classList.add("news-breaking");
+    }
+
+    const label = document.createElement("div");
+    label.className = "news-label";
+    label.textContent = "SIMULATED";
+
+    const top = document.createElement("div");
+    top.className = "news-card-top";
+
+    const category = document.createElement("span");
+    category.className = "news-category";
+    category.textContent = item.category;
+
+    const time = document.createElement("span");
+    time.className = "news-time";
+    time.textContent = item.time;
+
+    top.append(category, time);
+
+    const title = document.createElement("h2");
+    title.textContent = item.headline;
+
+    const description = document.createElement("p");
+    description.textContent = item.summary;
+
+    article.append(label, top, title, description);
+
+    return article;
+  }
+
+  async function loadNews(){
+    try{
+      const response = await fetch("/api/news");
+      if(!response.ok) return;
+
+      const data = await response.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+
+      if(feed){
+        feed.replaceChildren();
+
+        items.forEach(item => {
+          feed.appendChild(createNewsCard(item));
+        });
+      }
+
+      const breaking = items.find(item => item.breaking);
+
+      if(!breaking || !toast || !headline || !summary) return;
+
+      const seen = getSeenNews();
+
+      if(seen.includes(breaking.id)) return;
+
+      activeNewsId = breaking.id;
+
+      headline.textContent = breaking.headline;
+      summary.textContent = breaking.summary;
+
+      toast.hidden = false;
+
+      markNewsSeen(breaking.id);
+
+    }catch(error){
+      console.warn("Could not load simulated news:", error);
+    }
+  }
+
+  if(dismiss && toast){
+    dismiss.addEventListener("click", () => {
+      toast.hidden = true;
+      activeNewsId = null;
+    });
+  }
+
+  loadNews();
+
+  // Refresh the news feed every 30 seconds.
+  setInterval(loadNews, 30000);
+})();
 </script>
 </body>
 </html>
